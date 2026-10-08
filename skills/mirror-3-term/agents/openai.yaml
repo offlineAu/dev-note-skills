@@ -1,0 +1,4 @@
+interface:
+  display_name: Mirror 3-Term
+  short_description: Safely mirror all-program K-12 3-term grading and SHS extensions
+  default_prompt: Mirror the current all-program K-12 IBED three-term/periodic grading feature, dynamic ECR, and SHS Cluster/Plotting/Subject Picking extensions from the designated source repository into the target repository, preserving local customizations and verifying through real authenticated HTTP requests.

@@ -1,0 +1,59 @@
+# codex-skills
+
+Personal Codex/Claude skills, laid out so Codex's bundled `skill-installer` can
+install them directly from GitHub.
+
+## Install into Codex
+
+```bash
+python "$CODEX_HOME/skills/.system/skill-installer/scripts/install-skill-from-github.py" \
+  --repo offlineAu/codex-skills --path skills/dev-note
+```
+
+Or just ask Codex: *"install dev-note from offlineAu/codex-skills"* — the
+`skill-installer` skill handles it.
+
+Install several at once:
+
+```bash
+... --repo offlineAu/codex-skills --path skills/dev-note skills/mirror-3-term
+```
+
+The installer writes to `$CODEX_HOME/skills/<skill-name>` (default
+`~/.codex/skills`) and **aborts if that directory already exists** — remove or
+rename the existing copy to reinstall. Skills become available on the next turn;
+a fresh Codex start is the reliable way to pick up new ones.
+
+## Install into Claude Code
+
+Claude Code reads `~/.claude/skills/<name>/`, so copy the folder:
+
+```bash
+cp -r skills/dev-note ~/.claude/skills/dev-note
+```
+
+## Invoking
+
+- **Codex** — skills are not slash commands. Use `$dev-note`, or describe the
+  task and let the description trigger it.
+- **Claude Code** — `/dev-note`.
+
+## Skills
+
+| Skill | What it does |
+| --- | --- |
+| `dev-note` | Writes a dev note for the latest fix: problem, root cause, the change, verification. |
+| `mirror-3-term` | Mirrors K-12 three-term/periodic grading, dynamic ECR, and SHS Cluster/Plotting/Subject Picking between sibling repos. |
+
+## Layout
+
+Each skill is a directory under `skills/` containing `SKILL.md` (YAML
+frontmatter limited to `name`, `description`, `metadata`, `allowed-tools`,
+`license`) and an optional `agents/openai.yaml` giving Codex its display name,
+blurb, and default prompt.
+
+Validate before committing:
+
+```bash
+python "$CODEX_HOME/skills/.system/skill-creator/scripts/quick_validate.py" skills/dev-note
+```
