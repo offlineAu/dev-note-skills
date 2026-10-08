@@ -1,4 +1,4 @@
 interface:
   display_name: "Dev Note"
-  short_description: "Explain the latest fix and why it works"
-  default_prompt: "Use $dev-note to document the most recent fix in this repository."
+  short_description: "Explain the latest fix for customer service"
+  default_prompt: "Use $dev-note to write a plain-language note about the most recent fix for customer service."
