@@ -26,6 +26,23 @@ code until you can explain the mechanism. Do not guess from file names or commit
 subjects. Use `git log -L` or `git blame` on the changed lines when history
 explains why the old code existed.
 
+Also collect the record details for the note header:
+
+- **Developer:** the commit author (`git log -1 --format=%an <ref>`). For several
+  commits, list each distinct author. For uncommitted work, use
+  `git config user.name`. Use the name as recorded; never guess one.
+- **Date and time:** the commit date with timezone
+  (`git log -1 --format=%ad --date=format:'%Y-%m-%d %H:%M %z' <ref>`). For
+  uncommitted work, use the current local date and time and label it
+  "written". Use the latest commit's time when several are involved.
+- **Commits:** every commit that makes up the fix, as short SHA plus subject
+  (`git log --format='%h %s' <range>`). Uncommitted work: "Not committed yet".
+- **Pull request:** the PR that carries the fix. Try `gh pr list --state all
+  --search <sha> --json number,title,url,state` (or `gh pr view` on the
+  branch). Give number, title, link, and state (open, merged, closed). If `gh`
+  is unavailable or finds none, write "No pull request found". Never invent a
+  number or link.
+
 Then work out what the diff does not say:
 
 - What did the customer see go wrong? Use the words on the screen (page titles,
@@ -51,6 +68,10 @@ update the file if the same fix and date already has one). Use this shape:
 # <Title a customer would recognize>
 
 **Status:** <Not released yet | Merged for release | Live>
+**Developer:** <Name(s) from the commits>
+**Date and time:** <YYYY-MM-DD HH:MM +TZ>
+**Pull request:** <#123 Title (state) - link | No pull request found>
+**Commits:** <`abc1234` subject, one per line | Not committed yet>
 
 ## What happened
 <What customers saw, who it affected, and when it showed up. Quote any error
@@ -81,6 +102,9 @@ results, follow-ups and deploy steps.></sub>
 
 ## Rules
 
+- **Header is facts only.** Fill Developer, Date and time, Pull request, and
+  Commits from git and `gh` output, in plain wording. The commit list may be
+  long; keep one short line each and do not count it toward the word limit.
 - **Length.** About 200 to 350 words above the Dev line. Enough to explain the
   cause properly; no padding. Simple fixes can be shorter.
 - **Explain the cause, don't just name it.** "Why it happened" must answer how
@@ -108,5 +132,5 @@ If not, add the missing step or simplify the wording.
 
 ## Finish
 
-Print the note's path and its three facts in one line each: what customers saw,
-why it happened, whether it is live. Do not paste the whole note.
+Print the note's path and its facts in one line each: what customers saw, why it
+happened, whether it is live, who the developer was and when, and the PR. Do not paste the whole note.
