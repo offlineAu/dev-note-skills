@@ -42,6 +42,20 @@ The installer writes to `$CODEX_HOME/skills/<skill-name>` (default
 rename the existing copy to reinstall. Skills become available on the next turn;
 a fresh Codex start is the reliable way to pick up new ones.
 
+## Keep skills across Codex accounts (Windows)
+
+Each Codex account has its own skills folder, so switching accounts hides skills
+installed under the previous one. From a clone of this repo, run:
+
+```powershell
+powershell -File scripts\sync-skills.ps1
+```
+
+It copies every skill into `~/.codex`, each Orca account home, and the Orca
+shared runtime, replacing older copies of the same skills. Run it again after
+adding a new account or pulling skill updates. Add `-WhatIf` to preview, or
+`-Skill dev-note` to sync just one.
+
 ## Install into Claude Code
 
 Claude Code reads `~/.claude/skills/<name>/`, so copy the folder:
