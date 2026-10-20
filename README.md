@@ -1,4 +1,4 @@
-# codex-skills
+# dev-note-skills
 
 Personal Codex/Claude skills, laid out so Codex's bundled `skill-installer` can
 install them directly from GitHub.
@@ -7,16 +7,34 @@ install them directly from GitHub.
 
 ```bash
 python "$CODEX_HOME/skills/.system/skill-installer/scripts/install-skill-from-github.py" \
-  --repo offlineAu/codex-skills --path skills/dev-note
+  --repo offlineAu/dev-note-skills --path skills/dev-note
 ```
 
-Or just ask Codex: *"install dev-note from offlineAu/codex-skills"* — the
+On Windows, the line above fails in Command Prompt: `$CODEX_HOME` and the `\`
+line break are bash syntax. Use one line instead.
+
+PowerShell:
+
+```powershell
+python "$env:USERPROFILE\.codex\skills\.system\skill-installer\scripts\install-skill-from-github.py" --repo offlineAu/dev-note-skills --path skills/dev-note
+```
+
+Command Prompt:
+
+```bat
+python "%USERPROFILE%\.codex\skills\.system\skill-installer\scripts\install-skill-from-github.py" --repo offlineAu/dev-note-skills --path skills/dev-note
+```
+
+If `CODEX_HOME` is set to another folder, use it in place of
+`%USERPROFILE%\.codex`.
+
+Or just ask Codex: *"install dev-note from offlineAu/dev-note-skills"* — the
 `skill-installer` skill handles it.
 
 Install several at once:
 
 ```bash
-... --repo offlineAu/codex-skills --path skills/dev-note skills/mirror-3-term
+... --repo offlineAu/dev-note-skills --path skills/dev-note skills/mirror-3-term
 ```
 
 The installer writes to `$CODEX_HOME/skills/<skill-name>` (default
