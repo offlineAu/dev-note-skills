@@ -34,7 +34,7 @@ Or just ask Codex: *"install dev-note from offlineAu/dev-note-skills"* — the
 Install several at once:
 
 ```bash
-... --repo offlineAu/dev-note-skills --path skills/dev-note skills/mirror-3-term
+... --repo offlineAu/dev-note-skills --path skills/dev-note skills/mirror-3-term skills/port-changes
 ```
 
 The installer writes to `$CODEX_HOME/skills/<skill-name>` (default
@@ -76,6 +76,7 @@ cp -r skills/dev-note ~/.claude/skills/dev-note
 | --- | --- |
 | `dev-note` | Writes a dev note for the latest fix: problem, root cause, the change, verification. |
 | `mirror-3-term` | Mirrors K-12 three-term/periodic grading, dynamic ECR, and SHS Cluster/Plotting/Subject Picking between sibling repos. |
+| `port-changes` | Ports the current repo's uncommitted changes into one or more chosen sibling repos' `feature/fix` (updated from its base branch), commits only the port even in a dirty repo, and pushes after confirmation. |
 
 ## Layout
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Port Changes"
+  short_description: "Port working-tree changes to sibling repos' feature/fix"
+  default_prompt: "Use $port-changes to port my current uncommitted changes into other repos under D:\\laragon\\www."
