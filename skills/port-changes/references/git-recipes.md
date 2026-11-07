@@ -104,15 +104,8 @@ else                                                               git switch -c
 fi
 ```
 
-If `git switch` refuses ("would be overwritten"), nothing changed. Ask the user;
-on "stash":
-
-```bash
-git stash push -u -m "port-changes: $SRCNAME $(date +%Y%m%d-%H%M%S)"
-STASH_SHA=$(git rev-parse stash@{0})     # pop this exact entry later (R9)
-```
-
-then repeat R4.
+If `git switch` refuses ("would be overwritten"), nothing changed. Set aside
+only the files it names (R12), switch, and pop them back at the end (R9).
 
 ## R5. Update feature/fix (no history rewrite)
 
@@ -122,19 +115,17 @@ Run for `origin/feature/fix` (if it exists) and then `origin/$base`:
 up() {   # $1 = remote ref
   git merge-base --is-ancestor "$1" HEAD && { echo "up to date with $1"; return 0; }
   if git merge-base --is-ancestor HEAD "$1"; then
-    git merge --ff-only "$1"                    # refuses, unchanged, if it would touch dirty files
+    git merge --ff-only "$1" || { echo "COLLIDES WITH UNCOMMITTED EDITS: R12, then retry"; return 1; }
   else
-    git diff --cached --quiet || { echo "STAGED CHANGES: a real merge would sweep them in; ask"; return 1; }
-    git merge-tree --write-tree HEAD "$1" >/dev/null || { echo "MERGE WOULD CONFLICT with $1; ask"; return 1; }
-    git merge --no-edit "$1"                    # refuses, unchanged, if it would touch dirty files
+    side_merge "$1"                             # R10: real merges never happen in the live folder
   fi
 }
 git show-ref -q --verify refs/remotes/origin/feature/fix && up origin/feature/fix
 up "origin/$base"
 ```
 
-Any non-zero result: stop and show the user the output. Do not resolve
-conflicts or retry with other flags on your own.
+Return code 2 from `side_merge` = conflicts to resolve in the side worktree
+(R10). Run `up` for `origin/$base` only after `origin/feature/fix` is done.
 
 ## R6. Pre-port snapshot
 
@@ -187,8 +178,15 @@ Write the message to `$TW/msg.txt`, then:
 IDX="$TW/commit.idx"; rm -f "$IDX"
 OLD=$(git rev-parse HEAD)
 GIT_INDEX_FILE="$IDX" git read-tree "$OLD"
-GIT_INDEX_FILE="$IDX" git apply --cached --binary "$TW/port.patch" \
-  || { echo "PORT OVERLAPS PRE-EXISTING EDITS: ask"; exit 1; }
+# files whose port hunks overlap the user's uncommitted lines (handled by R11)
+: > "$TW/overlap.txt"
+git diff --name-only --no-renames "$PRE" "$POST" | while IFS= read -r p; do
+  git diff --binary "$PRE" "$POST" -- "$p" > "$TW/one.patch"
+  GIT_INDEX_FILE="$IDX" git apply --cached --check --binary "$TW/one.patch" 2>/dev/null || echo "$p" >> "$TW/overlap.txt"
+done
+ex=(); while IFS= read -r p; do ex+=(--exclude="$p"); done < "$TW/overlap.txt"
+GIT_INDEX_FILE="$IDX" git apply --cached --binary "${ex[@]}" "$TW/port.patch" || exit 1
+cat "$TW/overlap.txt"        # non-empty: run R11 for each path before going on
 GIT_INDEX_FILE="$IDX" git hook run --ignore-missing pre-commit || exit 1
 git hook run --ignore-missing commit-msg -- "$TW/msg.txt"   || exit 1
 TREE=$(GIT_INDEX_FILE="$IDX" git write-tree)
@@ -216,9 +214,111 @@ if [ "$NEW_BRANCH" = yes ]; then git push -u origin feature/fix; else git push o
 
 Rejected as non-fast-forward: fetch, R5 again, push again. Never `--force`.
 
-Restore a stash made in R4:
+Restore anything set aside with R12 (pop and, if needed, resolve as R12 shows).
+
+## R10. Merge in a side worktree (Resolving conflicts → A)
+
+The merge runs in a temporary detached worktree. The live folder only ever
+fast-forwards to the finished merge commit, so the user's dirty and staged
+files never take part.
+
+```bash
+side_merge() {   # $1 = ref to merge into feature/fix
+  MW="$TW/merge"
+  [ -e "$MW" ] && git worktree remove --force "$MW"
+  git worktree add -q --detach "$MW" HEAD || return 1
+  if git -C "$MW" merge --no-edit -m "Merge $1 into feature/fix" "$1"; then
+    finish_side_merge
+  else
+    echo "CONFLICTS in $MW:"; git -C "$MW" diff --name-only --diff-filter=U
+    return 2
+  fi
+}
+finish_side_merge() {
+  git -C "$MW" diff --name-only --diff-filter=U | grep -q . && { echo "STILL UNRESOLVED"; return 1; }
+  git -C "$MW" rev-parse -q --verify MERGE_HEAD >/dev/null && git -C "$MW" commit -q --no-edit
+  M=$(git -C "$MW" rev-parse HEAD)
+  git merge --ff-only "$M" || { echo "COLLIDES WITH UNCOMMITTED EDITS: R12, then: git merge --ff-only $M; git worktree remove --force \"$MW\""; return 1; }
+  git worktree remove --force "$MW"
+}
+```
+
+Resolving inside `$MW`, per conflicted path `p`:
+
+```bash
+cd "$MW"
+git show ":1:$p"   # common ancestor
+git show ":2:$p"   # ours   = feature/fix
+git show ":3:$p"   # theirs = the ref being merged
+git log --oneline -5 HEAD -- "$p"; git log --oneline -5 MERGE_HEAD -- "$p"
+# edit "$MW/$p" following "How to decide each conflicted hunk", then:
+git diff --check -- "$p"; grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- "$p"   # both must be empty
+php -l "$p"        # PHP files
+git add -- "$p"    # only the resolved path, never -A
+cd "$T"
+```
+
+Lock files: `git -C "$MW" checkout --theirs -- composer.lock && git -C "$MW" add composer.lock`
+(this is the one place a whole-file side is taken), then flag `composer install`.
+
+When every path is resolved: `finish_side_merge`. Add the per-file resolution
+lines to the merge commit (`git -C "$MW" commit --amend` before
+`finish_side_merge` is fine: nothing is pushed yet). To give up instead:
+`git -C "$MW" merge --abort; git worktree remove --force "$MW"`; the live folder
+is unchanged.
+
+## R11. Commit version of an overlapping file (Resolving conflicts → C)
+
+For each path in `$TW/overlap.txt`, after R8 applied the rest:
+
+```bash
+cv="$TW/commitver/$p"; mkdir -p "$(dirname "$cv")"
+git show "HEAD:$p" > "$cv"                  # target as committed, without the user's edits
+git diff "$PRE" "$POST" -- "$p"             # the port, as made in the live file
+# edit "$cv": apply ONLY the port change, by hand
+mode=$(git ls-tree HEAD -- "$p" | cut -d' ' -f1)
+blob=$(git hash-object -w --path="$p" "$cv")
+GIT_INDEX_FILE="$IDX" git update-index --cacheinfo "${mode:-100644},$blob,$p"
+GIT_INDEX_FILE="$IDX" git diff --cached "$OLD" -- "$p"   # must show the port and nothing else
+```
+
+Then continue R8 (hooks, `write-tree`, `commit-tree`). After the commit,
+`git diff HEAD -- "$p"` must show only the user's own edits; show it to them.
+
+## R12. Set aside colliding edits (Resolving conflicts → D)
+
+Collect the paths git refused on (it prints them indented with a tab), stash
+only those, redo the operation:
+
+```bash
+git switch feature/fix 2>&1 | sed -n 's/^\t//p' > "$TW/collide.txt"   # or the failing merge --ff-only
+mapfile -t C < "$TW/collide.txt"
+# GUARD: with no paths, `stash push --` stashes EVERYTHING and `reset --` unstages
+# everything. An empty list means git refused for another reason (e.g. diverged
+# branches: use R10). Stop here.
+[ ${#C[@]} -gt 0 ] || { echo "NO COLLIDING PATHS: not an R12 case"; cat "$TW/collide.txt"; return 1 2>/dev/null || exit 1; }
+git stash push -u -m "port-changes: $SRCNAME $(date +%Y%m%d-%H%M%S) set-aside" -- "${C[@]}"
+STASH_SHA=$(git rev-parse stash@{0})
+# ... redo the switch / fast-forward ...
+```
+
+Bring them back (now, or at the end of R9 if the port should land first):
 
 ```bash
 ref=$(git stash list --format='%gd %H' | awk -v h="$STASH_SHA" '$2==h{print $1}')
-[ -n "$ref" ] && git stash pop "$ref"   # on conflict the stash is kept: tell the user
+git stash pop "$ref"            # success: done, the stash is dropped
 ```
+
+If the pop conflicts, the stash is kept and files have markers
+(`Updated upstream` = the branch, `Stashed changes` = the user's work):
+
+```bash
+git diff --name-only --diff-filter=U        # resolve each file in place, then:
+[ ${#C[@]} -gt 0 ] || exit 1                # same guard: never run the lines below without paths
+grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- "${C[@]}"   # must be empty
+git reset -q -- "${C[@]}"                   # back to uncommitted and unstaged, like before
+git stash show -p "$ref" | head -50         # compare: every user edit is present
+git stash drop "$ref"                       # only after that check
+```
+
+Staged edits come back unstaged; tell the user which ones.
